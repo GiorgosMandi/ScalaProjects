@@ -1,0 +1,2 @@
+Akka is awesome
+Scala is also cool
