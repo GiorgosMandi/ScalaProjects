@@ -44,6 +44,8 @@ The messages can be of Any type **BUT** they must be:
 
 *Usually we communicate with Actors via case classes/objects*
 
+// TODO add actorSelection
+
 To stop an Actor, we can send him one of two special messages: 
 - PoisonPill
 - Kill
@@ -101,3 +103,66 @@ override val supervisorStrategy: OneForOneStrategy = OneForOneStrategy(){
 }
 ```
 
+## Scheduler & Timers
+
+Akka enables us to schedule tasks to run once or periodically, after a predefined period of time. 
+We do this using `system.scheduler.scheduleOnce` or `system.scheduler.schedule`, which both returns a 
+`Cancelable` enabling us to cancel the task if we want. See example:
+
+```scala
+ // schedule job to run once after 1 second
+ system.scheduler.scheduleOnce(1 second){
+     simpleActor ! "Start"
+ }(system.dispatcher)
+
+ // schedule job to run repeatedly every 2 seconds, after 1 second
+ val routine = system.scheduler.schedule(1 second, 2 second){
+     simpleActor ! "HeartBeat"
+ }(system.dispatcher)
+
+ // cancel repeated scheduler
+ system.scheduler.scheduleOnce(5 second){
+     routine.cancel()
+ }(system.dispatcher)
+```
+We can also schedule jobs to run within an Actor, by implementing a `Timers`. With `Timers`, we can schedule 
+jobs to run once (by sending messages), to run repeatedly and to cancel them, very similar as `system.schedule`
+See example:
+
+```scala
+case object TimerKey
+case object Start
+case object Stop
+case object Reminder
+case object Pause
+class TimerBasedHeartbeatActor extends Actor with ActorLogging with Timers {
+  // send message to myself after 500ms
+  timers.startSingleTimer(TimerKey, Start, 500 millis)
+
+  override def receive: Receive = {
+      case Start =>
+          log.info("Bootstrapping")
+          // send repeatedly message Reminder to myself every 1s
+          timers.startPeriodicTimer(TimerKey, Reminder, 1 second)
+      case Reminder =>
+          log.info("I am alive")
+      case Pause =>
+          log.info("I am stopping timer")
+          // Stop specific Timer
+          timers.cancel(TimerKey)
+      case Stop =>
+          log.info("I am stopping")
+          context.stop(self)
+  }
+}
+val timerActor = system.actorOf(Props[TimerBasedHeartbeatActor], "timerActor")
+
+system.scheduler.scheduleOnce(6 second) {
+  timerActor ! Stop
+}(system.dispatcher)
+
+system.scheduler.scheduleOnce(3 second) {
+  timerActor ! Pause
+}(system.dispatcher)
+
+```
