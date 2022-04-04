@@ -71,7 +71,7 @@ object StartingStoppingActors extends App{
     /**
      * Method #2 - using special messages
      *  -PoisonPill
-     *  -
+     *  -Kill
      */
 
     val looseActor = system.actorOf(Props[Child], "looseChild")

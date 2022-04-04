@@ -1,3 +1,63 @@
+# Rock The JVM: Akka Essentials
+
+Akka is a multithreading framework for the JVM that enables us to build powerful reactive, concurrent, and distributed applications more easily. 
+Akka is based on Actors, which are objects which we can only interact with via messages. Actors have the following properties:
+- every interaction happens via messaging
+- messages are asynchronous
+- we can't directly access the Actor object
+
+
+## Actors Basic
+An Actor implementation, looks like this 
+
+```scala
+import akka.actor.Actor
+
+class SimpleActor extends Actor {
+     override def receive: Receive = {
+         case number: Int => println(s"[$self]: I have received a number: $number")
+         case Some(content) => println(s"[$self]: I have received a special message: $content")
+         case "self" => println(s"[$self]: My self is ${self}")
+         case message: String => println(s"[$self]: I have received from ${sender().path} message: $message")
+     }
+ }
+```
+
+`Receive` is a type definition for `PartialFunction[Any, Unit]`. To initialize and communicate with an Actor
+do something like:
+
+Note, that we never directly access actors, so to communicate with an actor, we create an `ActorRef` and we 
+interact with this. We never initialize and access the fields of an actor.
+
+```scala
+import akka.actor.{ActorRef, ActorSystem, Props}
+
+val system = ActorSystem("actorCapabilitiesDemo")
+val simpleActor: ActorRef = system.actorOf(Props[SimpleActor], "simpleActor")
+simpleActor ! "hello, Actor"
+simpleActor ! 42
+simpleActor ! Some("this is special")
+```
+The messages can be of Any type **BUT** they must be:
+- IMMUTABLE
+- SERIALIZABLE
+
+*Usually we communicate with Actors via case classes/objects*
+
+To stop an Actor, we can send him one of two special messages: 
+- PoisonPill
+- Kill
+
+`PoisonPill` will smoothly stop an Actor by calling `context.stop`, while `Kill` will brutally kill him by
+throwing a `AkkaKillExceptions`.
+```scala
+import akka.actor.{Kill, PoisonPill}
+simpleActor1 ! Kill
+simpleActor2 ! PoisonPill
+```
+Any Actor can watch another Actor using `context.watch(ref)`. This way, if the watched actor dies, the watcher will
+receive the special message `Terminated(ref)` 
+
 ## Actors Life-Cycle
 
 Actors can be 
@@ -12,6 +72,9 @@ Actors can be
  - stop: stops an ActorRef. All watchers of the ref will receive `Terminated(ref)` message
 
 *Note, that when a parent is being restarted, all of its children get stopped!*
+
+Classic actors have methods `preStart`, `preRestart`, `postRestart` and `postStop` that can be overridden to act on changes to 
+the actor’s lifecycle.
 
 
 ## Supervision Strategy
