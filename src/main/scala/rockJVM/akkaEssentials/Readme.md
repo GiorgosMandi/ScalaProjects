@@ -44,8 +44,36 @@ The messages can be of Any type **BUT** they must be:
 
 *Usually we communicate with Actors via case classes/objects*
 
-// TODO add actorSelection
+### Actors Hierarchy
+Within Actors there is a hierarchy, an Actor can create other actors which can manage.
+Thus, we can see that there is a hierarchy between actors:
+```
+parent -> daughter -> grandSon
+        \
+         -> son -> grandDaughter
+```
+This representation is displayed in Actors' `path`.
+```
+akka://system/user/parent
+akka://system/user/parent/daughter
+akka://system/user/parent/son
+akka://system/user/parent/daughter/grandSon
+akka://system/user/parent/son/grandDaughter
+```
+Notice that the parent actor is not a root actor, but it originates from `akka://system/user/`
+Both `system` and `user` is a top level Actors known as **Guardian-Actors**. The Guardian 
+Actors are:
+- `/system`: system guardian
+- `/user`: user-level guardian
+- `/`: root guardian
 
+Using this `path` we can pick a specific actor using `system.actorSelection`
+```scala
+val childSelection = system.actorSelection("/user/parent/child")
+childSelection ! "I found you"
+```
+
+### Stopping an Actor
 To stop an Actor, we can send him one of two special messages: 
 - PoisonPill
 - Kill
@@ -164,5 +192,86 @@ system.scheduler.scheduleOnce(6 second) {
 system.scheduler.scheduleOnce(3 second) {
   timerActor ! Pause
 }(system.dispatcher)
+```
+
+## Routers
+
+Routers are extremely useful when you want to delegate or spread work between multiple
+actors of the same kind. Routers are usually meta-level actors that forward messages to other actors,
+either created by router itself or from the outside. 
+
+Supported options for routing logic:
+
+- *RoundRobin*: cycles between routines
+- *Random*: randomly pick the next actor (not recommended)
+- *Smallest Mailbox*: send to the actor with the fewer messages in the queue
+- *Broadcast*: send the same message to all actors
+- *Scatter-Gather first*: broadcast message to everyone and delegate to the first who replies - all others replies are discarded
+- *Tail-Chopping*: send message sequentially to actors and delegate to the first who replies - all others replies are discarded
+- *Consistent Hashing*: all the messages with the same hash go to the same actor
+
+There are three main ways of defining routers:
+
+1. Manual: by adding/removing slaves in a `Router` (not recommended)
+2. Pool Routers: Router can create child actors in itself, by calling a logic pool (i.e., RoundRobingPool)
+   
+```scala
+   val masterPool = system.actorOf(RoundRobinPool(nrOfInstances = 5).props(Props[Slave]))
+```
+
+3. Group Routers: assign routees that are defined elsewhere, by only using their `path`
+```scala
+val slavesPaths = slavesList.map(slaveRef => slaveRef.path.toString)
+val groupMaster = system3.actorOf(RoundRobinGroup(slavesPaths).props())
+```
+
+## Mailbox
+
+Akka allows us to overwrite the behaviour of mailbox, for instance we can prioritize some messages
+This can be done as following
+
+```scala
+ /**
+  * Interesting case #1  - custom priority mailbox
+  * P0 -> most important
+  * P1 -> less important
+  * P2 -> less important
+  * P3 -> least important
+  */
+
+ // Step 1 - make mailbox configuration
+ class SupportTicketPriorityMailbox(settings: ActorSystem.Settings, config: Config)
+   extends UnboundedPriorityMailbox(PriorityGenerator{
+       case message: String if message.startsWith("[P0]") => 0
+       case message: String if message.startsWith("[P1]") => 1
+       case message: String if message.startsWith("[P2]") => 2
+       case message: String if message.startsWith("[P3]") => 3
+       case _ => 4
+   })
+
+ // Step 2 - make it known to the configuration
+ // Step 3 - attach the dispatcher to an actor
+ val supportTickerLogger = system.actorOf(Props[SimpleActor].withDispatcher("support-ticket-dispatcher"), "supportTickerLogger")
+ supportTickerLogger ! PoisonPill // even this is postponed
+ supportTickerLogger ! "[P3] this would be nice to have"
+ supportTickerLogger ! "[P0] this needs to be solved NOW!"
+ supportTickerLogger ! "[P1] do this when you have the time"
 
 ```
+
+## Stashing
+
+Stashing allows us to postpone messages so to be handled in the future, 
+for instance in a context state that supports them.
+Stash works as a different queue that coexists with the mailbox, 
+in which we store all the messages we want to process in the future. When we release the messages, they
+are inserted in the start of the mailbox.
+To use stash, the Actor must extend `akka.actor.Stash`. Then: 
+- To stash message we `stash()`
+- To release all messages and prepend them to the mailbox use `unstashAll()`
+
+When we use Stash, we need be very careful with 
+- potential memory bounds of Stash
+- potential memory bounds of mailbox when we unstash
+- no stashing twice -> throws Exception
+- Stash trait overrides `preRestart`, so always extend it after `Actor` 
