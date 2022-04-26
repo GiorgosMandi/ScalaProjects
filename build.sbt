@@ -12,11 +12,16 @@ libraryDependencies += "io.circe" %% "circe-parser" % "0.15.0-M1"
 libraryDependencies += "io.circe" %% "circe-generic" % "0.15.0-M1"
 
 // Akka Essentials
-val akkaVersion ="2.5.13"
+val akkaVersion ="2.5.19"
 // https://mvnrepository.com/artifact/com.typesafe.akka/akka-actor
 libraryDependencies += "com.typesafe.akka" %% "akka-actor" % akkaVersion
 // https://mvnrepository.com/artifact/com.typesafe.akka/akka-testkit
 libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % akkaVersion
+
+
+// Akka Streams
+libraryDependencies += "com.typesafe.akka" %% "akka-stream" % akkaVersion
+libraryDependencies += "com.typesafe.akka" %% "akka-stream-testkit" % akkaVersion
 
 val testVersion = "3.2.11"
 libraryDependencies += "org.scalactic" %% "scalactic" % testVersion
