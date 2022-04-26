@@ -1,37 +1,36 @@
 package rockJVM.akkaEssentials.part6patterns
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Cancellable, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Cancellable, FSM, Props}
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpecLike
-import rockJVM.akkaEssentials.part6patterns.FSMSpec.{RequestProduct, VendingError, VendingMachine}
 
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class FSMSpec extends TestKit(ActorSystem("AskSpec")) with ImplicitSender with AnyWordSpecLike with BeforeAndAfterAll{
-    import FSMSpec._
-    import FSMSpec.VendingError._
+class VendingMachine extends TestKit(ActorSystem("AskSpec")) with ImplicitSender with AnyWordSpecLike with BeforeAndAfterAll{
+    import VendingMachine.VendingError._
+    import VendingMachine._
 
     override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
     "Vending Machine" should {
         "Fail when not initialized" in {
-            val vendingMachine = system.actorOf(Props[VendingMachine])
+            val vendingMachine = system.actorOf(Props[VendingMachineActor])
             vendingMachine ! RequestProduct("coke")
             expectMsg(VendingError(NOT_INITIALIZED))
         }
 
         "Fail when product is not available" in {
-            val vendingMachine = system.actorOf(Props[VendingMachine])
+            val vendingMachine = system.actorOf(Props[VendingMachineActor])
             vendingMachine ! Initialize(Map("coke" -> 10), Map("coke" -> 1))
             vendingMachine ! RequestProduct("sandwich")
             expectMsg(VendingError(PRODUCT_NOT_AVAILABLE))
         }
 
         "Throw timeout if we don't insert money" in {
-            val vendingMachine = system.actorOf(Props[VendingMachine])
+            val vendingMachine = system.actorOf(Props[VendingMachineActor])
             vendingMachine ! Initialize(Map("coke" -> 10), Map("coke" -> 1))
             vendingMachine ! RequestProduct("coke")
             expectMsg(Instructions(s"Please insert 1 dollars"))
@@ -41,7 +40,7 @@ class FSMSpec extends TestKit(ActorSystem("AskSpec")) with ImplicitSender with A
             }
         }
         "Handle the reception of partial money " in {
-            val vendingMachine = system.actorOf(Props[VendingMachine])
+            val vendingMachine = system.actorOf(Props[VendingMachineActor])
             vendingMachine ! Initialize(Map("coke" -> 10), Map("coke" -> 3))
             vendingMachine ! RequestProduct("coke")
             expectMsg(Instructions(s"Please insert 3 dollars"))
@@ -57,7 +56,7 @@ class FSMSpec extends TestKit(ActorSystem("AskSpec")) with ImplicitSender with A
         }
 
         "Handle the case of giving back changes " in {
-            val vendingMachine = system.actorOf(Props[VendingMachine])
+            val vendingMachine = system.actorOf(Props[VendingMachineActor])
             vendingMachine ! Initialize(Map("coke" -> 10), Map("coke" -> 3))
             vendingMachine ! RequestProduct("coke")
             expectMsg(Instructions(s"Please insert 3 dollars"))
@@ -67,7 +66,7 @@ class FSMSpec extends TestKit(ActorSystem("AskSpec")) with ImplicitSender with A
         }
 
         "Buy product and be available for a new order" in {
-            val vendingMachine = system.actorOf(Props[VendingMachine])
+            val vendingMachine = system.actorOf(Props[VendingMachineActor])
             vendingMachine ! Initialize(Map("coke" -> 10), Map("coke" -> 3))
             vendingMachine ! RequestProduct("coke")
             expectMsg(Instructions(s"Please insert 3 dollars"))
@@ -82,7 +81,7 @@ class FSMSpec extends TestKit(ActorSystem("AskSpec")) with ImplicitSender with A
 
 }
 
-object FSMSpec{
+object VendingMachine{
 
     object VendingError{
         val NOT_INITIALIZED = "Machine not initialized"
@@ -99,7 +98,7 @@ object FSMSpec{
     case class VendingError(reason: String)
     case object ReceiveMoneyTimeout
 
-    class VendingMachine extends Actor with ActorLogging {
+    class VendingMachineActor extends Actor with ActorLogging {
         import VendingError._
 
         override def receive: Receive = idle
@@ -153,12 +152,12 @@ object FSMSpec{
                     val rest = price - totalMoney
                     requester ! Instructions(s"Please insert $rest dollars")
                     context.become(waitForMoney(
-                        inventory,
-                        prices,
-                        product,
-                        totalMoney,
-                        startReceiveMoneyTimeoutSchedule,
-                        requester)
+                                        inventory,
+                                        prices,
+                                        product,
+                                        totalMoney,
+                                        startReceiveMoneyTimeoutSchedule,
+                                        requester)
                     )
                 }
         }
