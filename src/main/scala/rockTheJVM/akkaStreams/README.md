@@ -268,3 +268,75 @@ import scala.concurrent.duration._
 // spawn 2 elements per 1 second
 fastSource.throttle(2, 1 second)
 ```
+
+
+## GraphDSL 
+
+GraphDSL is a library which enables the design the implementation of complex graphs. For instance, here is an example of building a complex graph, using GraphDSL.
+
+![graph-complex-flow](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/graph-complex-flow.png)
+
+```scala
+val input = Source(1 to 1000)
+val incrementer = Flow[Int].map(x => x + 1)
+val multiplier = Flow[Int].map(x => x * 10)
+val output = Sink.foreach[(Int, Int)](println)
+
+// step 1 - setting up the fundamentals of the graph
+val graph = RunnableGraph.fromGraph(GraphDSL.create(){ implicit builder: GraphDSL.Builder[NotUsed] => // builder is a MUTABLE data structure
+
+    // step 2 - add the necessary components of the graph
+    val broadcast = builder.add(Broadcast[Int](2)) // fan-out operator
+    val zip = builder.add(Zip[Int, Int])
+
+    // step 3 - tying up the components
+    input ~> broadcast
+
+    broadcast.out(0) ~> incrementer ~> zip.in0
+    broadcast.out(1) ~> multiplier ~> zip.in1
+
+    zip.out ~> output
+
+    ClosedShape // Freeze builder -> builder becomes IMMUTABLE
+})
+
+graph.run()
+```
+
+Another example is the following 
+![graph-complex-flow](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/merge-balance.png)
+
+
+```scala
+import scala.concurrent.duration._
+val fastSource = Source(1 to 100 ).filter(_ % 2 == 0).throttle(4, 1 second)
+val slowSource = Source(1 to 100).filter(_ % 2 == 1).throttle(2, 1 second)
+val graph = RunnableGraph.fromGraph(GraphDSL.create(){ implicit builder: GraphDSL.Builder[NotUsed] =>
+
+    val merge = builder.add(Merge[Int](2))
+    val balance = builder.add(Balance[Int](2, waitForAllDownstreams=true))
+    fastSource ~> merge
+    slowSource ~> merge
+    merge ~> balance
+    balance ~> output1
+    balance ~> output2
+
+    ClosedShape
+})
+graph.run()
+
+```
+
+`Balance`: Fan-out the stream to several streams. Each upstream element is emitted to the first available downstream consumer.
+
+`Broadcast`: Emit each incoming element each of n outputs.
+
+`Merge`: Merge multiple sources. Picks elements randomly if all sources has elements ready.
+
+`Zip`: Combine the elements of 2 streams into a stream of tuples.
+
+
+
+
+
+
