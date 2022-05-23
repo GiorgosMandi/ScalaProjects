@@ -335,6 +335,59 @@ graph.run()
 
 `Zip`: Combine the elements of 2 streams into a stream of tuples.
 
+We can create more `Shapes` using GraphDSL like `SourceShapes`, `SinkShapes` and `FlowShapes`
+
+```scala
+val firstSource = Source(1 to 10)
+val secondSource = Source(42 to 1000)
+val sourceGraph = Source.fromGraph({
+  GraphDSL.create(){implicit builder =>
+
+      val concat = builder.add(Concat[Int](2))
+      firstSource ~> concat
+      secondSource ~> concat
+
+      SourceShape(concat.out)
+  }
+})
+
+sourceGraph.to(Sink.foreach(println)).run()
+
+/*
+  complexSink
+*/
+val sink1 = Sink.foreach[Int](x => println(s"Meaningful thing 1: $x"))
+val sink2 = Sink.foreach[Int](x => println(s"Meaningful thing 2: $x"))
+val sinkGraph = Sink.fromGraph({
+      GraphDSL.create() { implicit builder =>
+          val broadcast = builder.add(Broadcast[Int](2))
+          broadcast ~> sink1
+          broadcast ~> sink2
+          SinkShape(broadcast.in)
+      }
+})
+
+val incrementer = Flow[Int].map(_+1)
+val multiplier = Flow[Int].map(_*10)
+
+val flowGraph = Flow.fromGraph({
+  GraphDSL.create() { implicit builder =>
+      // everything on GraphDSL operates on shapes
+
+      // define shapes
+      val incrementerShape = builder.add(incrementer)
+      val multiplierShape = builder.add(multiplier)
+
+      // connect shapes
+      incrementerShape ~> multiplierShape
+      FlowShape(incrementerShape.in, multiplierShape.out)
+  }
+})
+
+sourceGraph.via(flowGraph).to(sinkGraph).run()
+
+```
+
 
 
 
