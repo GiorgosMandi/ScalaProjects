@@ -388,6 +388,46 @@ sourceGraph.via(flowGraph).to(sinkGraph).run()
 
 ```
 
+Another great example, is the following. Here we build a suspicious transaction detection pipeline:
+
+```scala
+case class Transaction(id: String, source: String, recipient: String, amount: Int, date: Date)
+val transactionSource = Source(List(
+    Transaction("526884", "George", "Teo", 100, new Date),
+    Transaction("436542", "Sofia", "Helen", 100000, new Date),
+    Transaction("876342", "Teo", "Sofia", 4322, new Date),
+    Transaction("543265", "George", "Emmanouil", 542311, new Date),
+    Transaction("876523", "Emmanouil", "George", 4421, new Date),
+))
+val suspiciousAmount = 10000
+val bankProcessor = Sink.foreach[Transaction](println)
+val suspiciousAnalysisService = Sink.foreach[String](trxId => println(s"Suspicious transaction: $trxId"))
+
+val suspiciousTransactionStaticGraph = GraphDSL.create(){ implicit builder =>
+    val broadcast = builder.add(Broadcast[Transaction](2))
+    val suspiciousFilter = builder.add(Flow[Transaction].filter(trx => trx.amount > suspiciousAmount))
+    val trxIdExtractor = builder.add(Flow[Transaction].map(trx => trx.id))
+
+    broadcast.out(0) ~> suspiciousFilter ~> trxIdExtractor
+
+    new FanOutShape2(broadcast.in, broadcast.out(1), trxIdExtractor.out)
+}
+
+val suspiciousRunnableGraph = RunnableGraph.fromGraph({
+    GraphDSL.create(){ implicit builder =>
+        val suspiciousTransactionComponent = builder.add(suspiciousTransactionStaticGraph)
+
+        transactionSource ~> suspiciousTransactionComponent.in
+        suspiciousTransactionComponent.out0 ~> bankProcessor
+        suspiciousTransactionComponent.out1 ~> suspiciousAnalysisService
+
+        ClosedShape
+    }
+})
+suspiciousRunnableGraph.run()
+
+```
+
 
 
 
