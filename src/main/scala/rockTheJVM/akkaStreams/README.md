@@ -428,6 +428,73 @@ suspiciousRunnableGraph.run()
 
 ```
 
+### Bidirectional Flow 
+
+Here is an example of bidirectional flow using a simple encrypt/decrypt problem. To create
+bidirectional flow, we use the `BidiShape` in which we define the shapes. Then we interact 
+with these shapes using the `.inX`, `.outX` functions.
+
+```scala
+
+def encrypt(n: Int)(message: String): String = message.map(c => (c + n).toChar)
+def decrypt(n: Int)(message: String): String = message.map(c => (c - n).toChar)
+
+val bidiCryptoStaticGraph = GraphDSL.create(){ implicit builder =>
+    val encryptionFlowShape = builder.add(Flow[String].map(encrypt(3)))
+    val decryptionFlowShape = builder.add(Flow[String].map(decrypt(3)))
+
+    BidiShape.fromFlows(encryptionFlowShape, decryptionFlowShape)
+}
+
+val unencryptedMessage = List("akka", "is", "awesome", "testing", "bidirectional", "streams" )
+val unencryptedSource = Source(unencryptedMessage)
+val encryptedSource = Source(unencryptedMessage.map(msg => encrypt(3)(msg)))
+
+val cryptoBidiGraph = RunnableGraph.fromGraph(
+    GraphDSL.create() { implicit builder =>
+        val unencryptedSourceShape = builder.add(unencryptedSource)
+        val encryptedSourceShape = builder.add(encryptedSource)
+        val bidi = builder.add(bidiCryptoStaticGraph)
+        val encryptedSinkShape = builder.add(Sink.foreach[String](s => println(s"Encrypted: $s")))
+        val decryptedSinkShape = builder.add(Sink.foreach[String](s => println(s"Decrypted: $s")))
+
+        unencryptedSourceShape ~> bidi.in1 ; bidi.out1 ~> encryptedSinkShape
+        decryptedSinkShape <~ bidi.out2 ; bidi.in2 <~ encryptedSourceShape
+
+        ClosedShape
+    }
+)
+
+cryptoBidiGraph.run()
+
+```
+
+
+### Cycle Graphs
+
+GraphDSL allows us to create a cycle graph, such as:
+
+```scala
+val accelerator = GraphDSL.create() { implicit builder =>
+  val sourceShape = builder.add(Source(1 to 10))
+  val mergerShape = builder.add(Merge[Int](2))
+  val incrementerShape = builder.add(Flow[Int].map { x =>
+      println(s"$x")
+      x + 1
+  })
+
+  sourceShape ~> mergerShape ~> incrementerShape
+              mergerShape <~ incrementerShape
+  ClosedShape
+}
+
+RunnableGraph.fromGraph(accelerator).run()
+```
+
+However, such graph will not work, as we always pressure the graph with new elements, leading to backpresure and hence to the stop of the flow. This is very common in cycle graphs and it is known as **Graph cycle dead lock**. 
+
+A way to avoid this is to use `MergePreferred` instead of `Merge` prefers an element from its
+preferred port and always consume from there. Another way is to configure backpresure in such a way in order to avoid stoping the flow, for instance using `dropHead`
 
 
 
