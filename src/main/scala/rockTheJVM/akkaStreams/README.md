@@ -494,7 +494,14 @@ RunnableGraph.fromGraph(accelerator).run()
 However, such graph will not work, as we always pressure the graph with new elements, leading to backpresure and hence to the stop of the flow. This is very common in cycle graphs and it is known as **Graph cycle dead lock**. 
 
 A way to avoid this is to use `MergePreferred` instead of `Merge` prefers an element from its
-preferred port and always consume from there. Another way is to configure backpresure in such a way in order to avoid stoping the flow, for instance using `dropHead`
+preferred port and always consume from there. Another way is to configure backpresure in such a way in order to avoid stopping the flow, for instance using `dropHead`. To be more precise, to avoid cycle deadlocking must either:
+
+- add bounds to the number of elements in the cycle
+- decrease the liveness of the cycle.
+
+In the source code, you will find the implementation of the Fibonacci sequence as a cycle graph.
+
+![fibonacci_seq_cycle.png](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/fibonacci_seq_cycle.png)
 
 
 
