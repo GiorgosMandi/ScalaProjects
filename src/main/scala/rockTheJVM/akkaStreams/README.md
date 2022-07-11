@@ -504,6 +504,80 @@ In the source code, you will find the implementation of the Fibonacci sequence a
 ![fibonacci_seq_cycle.png](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/fibonacci_seq_cycle.png)
 
 
+## Integration with Actors
+
+In Akka-Streams, we can use regular Akka Actors as stream components, i.e., Flow, Source and as Sinks.
 
 
+### Actors as a Flow 
 
+With the **Ask** pattern, we can use Actors as intermediate components of streams, i.e., as Flows.  In the Ask pattern, you ask an actor by sending a message and receive a response as a `Future`. Since the response is a `Future` it depends on a timeout which defines how much time to wait for the `Future` to complete.
+
+```scala
+implicit val timeout: Timeout = Timeout(2 second)
+val actorBasedFlow = Flow[Int].ask[Int](parallelism = 4)(simpleActor)
+
+numberSource.via(actorBasedFlow).to(Sink.ignore).run()
+// equivalent
+numberSource.ask(parallelism = 4)(simpleActor).to(Sink.ignore).run()
+```
+In this example, `parallelism` defines the size of the mailbox, which means how many messages can be in the actors mailbox before starting back-pressuring.
+
+
+### Actors as a Source
+
+To use Actors as a Source, we use the `actorRef` method. After constructing a graph using an `actorRef` as the source of the graph, the materialized value is the reference of the actor (i.e., `ActorRef`) and not the outcome of the graph. Hence, all the messages sended to the actor will be forwarded to the graph. To terminate only when the actor receives a specialized message.
+
+```scala
+val actorPoweredSource = Source.actorRef[Int](bufferSize = 10, overflowStrategy = OverflowStrategy.dropHead)
+// the materialized value of the source in the ActorRef
+val materializedActorRef: ActorRef = actorPoweredSource.to(Sink.foreach[Int](n => println(s"Actor powered flow got number: $n"))).run()
+materializedActorRef ! 10
+// to terminate the stream we need a specialized message
+materializedActorRef ! akka.actor.Status.Success("complete")
+```
+
+
+### Actors as a Sink
+
+To use an Actor as a Sink, known also as a Destination, is a little more complicated. The Actor must have some specific characteristics:
+
+- An initialization message.
+- An ACK message used as repsonse to confirm the reception of a message.  The absence on ACK will be interpreted as back-pressure.
+- A complete message, which notifies the sender that the actor has/will be stopped.
+- A function that handels the case the stream throws an exception.
+
+```scala
+case object StreamInit
+case object StreamAck
+case object StreamComplete
+case class StreamFail(ex: Throwable)
+
+class DestinationActor extends Actor with ActorLogging {
+
+    override def receive: Receive = {
+        case StreamInit =>
+            log.info("Stream Initialized")
+            sender() ! StreamAck
+        case StreamComplete =>
+            log.info("Stream complete")
+            context.stop(self)
+        case StreamFail(ex) =>
+            log.warning(s"Stream Failed: $ex")
+        case message =>
+            log.info(s"Message $message has come to its final destination.")
+            sender() ! StreamAck
+    }
+}
+
+val destinationActor = system.actorOf(Props[DestinationActor], "destinationActor")
+val actorPoweredSink = Sink.actorRefWithAck[Int](
+    destinationActor,
+    onInitMessage = StreamInit,
+    onCompleteMessage = StreamComplete,
+    ackMessage = StreamAck,
+    onFailureMessage = throwable => StreamFail(throwable)
+)
+
+Source(1 to 10).to(actorPoweredSink).run()
+```
