@@ -581,3 +581,27 @@ val actorPoweredSink = Sink.actorRefWithAck[Int](
 
 Source(1 to 10).to(actorPoweredSink).run()
 ```
+
+## Integrating with other Services
+
+Akka streams can interact easily with other services such as external APIs, DB calls, etc. Such external services return
+a `Future[A]`, so to handle it we can use the `mapAsync` method:
+
+```scala
+mySource.mapAsync(parallelism = 5)(element => externalService.externalCall(element))
+```
+
+In `mapAsync`: 
+ - the `Future`s are evaluated in parallel, defined by the parallelism argument
+ - the relative order of element (in the source) is maintained
+ - a lagging `Future` will stall the entire stream
+
+If the relative order of the elements is not important, we can use `mapAsyncUnordered` which is faster but the preservation
+of the relative order is not guaranteed.
+
+```scala
+mySource.mapAsyncUnordered(parallelism = 5)(element => externalService.externalCall(element))
+```
+
+***Important Note***: never user the same dispatcher (of execution context) for Actors and Futures otherwise it is potential
+to starve the execution context.
