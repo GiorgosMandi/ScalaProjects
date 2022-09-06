@@ -203,13 +203,13 @@ Source(1 to 3)
 Results:
 ```
 Flow A: 1
-Flow B: 1
-Flow C: 1
 Flow A: 2
-Flow B: 2
-Flow C: 2
+Flow B: 1
 Flow A: 3
+Flow B: 2
+Flow C: 1
 Flow B: 3
+Flow C: 2
 Flow C: 3
 ```
 In every case, there is a guaranteed ordering. In async, it is given that every step of each element will be processed before its next element. For instance `Flow A: 1` will always be performed before `Flow A: 2`, and similarly for all the next steps.
@@ -605,3 +605,78 @@ mySource.mapAsyncUnordered(parallelism = 5)(element => externalService.externalC
 
 ***Important Note***: never user the same dispatcher (of execution context) for Actors and Futures otherwise it is potential
 to starve the execution context.
+
+## Alternatives to Backpressure
+
+There are cases we cannot use backpreassure for instances when the source is time based. So, some alternatives are 
+ - to aggregate/merge the incoming messages when the downstream is faster than the upstream (slow sink)
+ - to extrapolate new messages when the upstream is faster than the downstream (slow producer)
+
+To aggregate, we can use `conflate` which only merges the input messages if the production rate is faster than the 
+consumption rate. `conflate` decouples the upstream rate from the downstream rate and it basically never get backpreassure
+
+```scala
+val aggregateNotificationFlow = Flow[PagerEvent].conflate((event1, event2) => {
+  Event(event1.combine(event2))
+})
+.map(event => ..)
+```
+
+When the production rate is slower than the consumption rate, but we want to keep the engines running,
+we can extrapolate new messages based on the coming messages. Such methods are the `extrapolate` and the `expand`
+
+- `extrapolate` produces new messages only when there is demand
+- `expand` produces constantly new elements
+
+```scala
+val expand = Flow[Int].expand(n => Iterator.from(n))
+val repeater = Flow[Int].extrapolate(n => Iterator.continually(n))
+```
+
+## Fault Tolerance
+
+1. Logging is important to detect and identify errors
+
+```scala
+faultySource.log("trackingElements").to(Sink.ignore)
+
+```
+2. Recover stream from an exception with `recover` or `recoverWithRetries` which allow us to replace the faulty value or 
+even to replace the whole stream
+
+```scala
+val recoverableGraph = faultySource.recover {
+    case _: RuntimeException => Int.MinValue
+}
+  .log("gracefulSource")
+  .to(Sink.ignore)
+
+val recoverWithRetriesGraph = faultySource.recoverWithRetries(3, {
+  case _: RuntimeException => Source(90 to 99)
+})
+.log("recoverWithRetries")
+.to(Sink.ignore)
+```
+
+3. Backoff supervision which denotes how a stream will be recoverd after failuer
+
+```scala
+import scala.concurrent.duration._
+val restartSource = RestartSource.onFailuresWithBackoff(
+    minBackoff = 2 second,
+    maxBackoff = 30 second,
+    randomFactor = 0.2,
+    maxRestarts = 10
+)(() => {Source(1 to 10)})
+```
+
+4. Supervision strategies to gracefully recover from errors. Our choices are to
+- `Resume`: skip faulty elements
+- `Stop`: stop the whole stream
+- `Restart` resume and clear the internal state
+```scala
+val supervisedNumbers = source.withAttributes(ActorAttributes.supervisionStrategy {
+  case _: RuntimeException => Resume
+  case _ => Stop
+})
+``` 
