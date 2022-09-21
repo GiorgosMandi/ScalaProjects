@@ -680,3 +680,19 @@ val supervisedNumbers = source.withAttributes(ActorAttributes.supervisionStrateg
   case _ => Stop
 })
 ``` 
+
+
+### Substreams
+
+In Akka-streams we can split a stream into a series of substreams, which we can process individually and in parallel, 
+and in the end we can merge them. This can be done using 
+
+- `groupBy` where we split based on a key defined by a function
+- `splitWhen` where we can split based on a condition
+
+The substreams can be merged by calling `mergeSubstreams` or `mergeSubstreamsWithParallelism`. Note that in most of the 
+time, we can configure the substreams to run in parallel 
+
+
+![fibonacci_seq_cycle.png](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/substreams.png)
+

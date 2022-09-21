@@ -1,16 +1,16 @@
-package rockTheJVM.akkaStreams.part4_techniques
+package rockTheJVM.akkaStreams.part5_advanced
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Broadcast, BroadcastHub, Flow, Keep, MergeHub, Sink, Source}
+import akka.stream.scaladsl.{BroadcastHub, Keep, MergeHub, Sink, Source}
 import akka.stream.{ActorMaterializer, KillSwitches}
-
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
-object DynamicStreamHandling extends App{
+object DynamicStreamHandling extends App {
     implicit val system: ActorSystem = ActorSystem("DynamicStreamHandling")
     implicit val materializer: ActorMaterializer = ActorMaterializer()
+
     import system.dispatcher
+
     /*
      #1 - Kill switch
         Terminate your stream at any point of you choosing by exposing the killSwitch as the materialized value
@@ -21,7 +21,9 @@ object DynamicStreamHandling extends App{
 
     val killSwitchGraph = counter.viaMat(killSwitchFlow)(Keep.right).to(sink)
     val killSwitch = killSwitchGraph.run()
-    system.scheduler.scheduleOnce(delay = 3 second){killSwitch.shutdown()}
+    system.scheduler.scheduleOnce(delay = 3 second) {
+        killSwitch.shutdown()
+    }
 
     // shared kill switch
     val anotherCounter = Source(Stream.from(1)).throttle(2, 1 second).log("anotherCounter")
@@ -30,7 +32,9 @@ object DynamicStreamHandling extends App{
     counter.viaMat(sharedKillSwitchFlow.flow)(Keep.right).to(sink).run()
     anotherCounter.viaMat(sharedKillSwitchFlow.flow)(Keep.right).to(sink).run()
     // shutdown both graphs
-    system.scheduler.scheduleOnce(delay = 3 second){sharedKillSwitchFlow.shutdown()}
+    system.scheduler.scheduleOnce(delay = 3 second) {
+        sharedKillSwitchFlow.shutdown()
+    }
 
 
     /*
