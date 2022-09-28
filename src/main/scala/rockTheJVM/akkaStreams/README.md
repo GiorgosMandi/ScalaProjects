@@ -696,3 +696,42 @@ time, we can configure the substreams to run in parallel
 
 ![fibonacci_seq_cycle.png](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/substreams.png)
 
+### Custom Shapes
+
+Using Akka API we can construct our own shapes such us Source, Sink or Flow, that implements our logic. 
+To do this, we extend the `GraphStage` class with a given shape, then we define the ports (Inlets and Outlets) and we 
+describe our logic in the `createLogic` method by specifying In/Out handlers. 
+
+Important to note that in order to start the stream there must an upstream or downstream demand, either from Sink or
+from Source respectively. So, in the `preStart` phase, either the Source will `push(outPort, item)`, or the Sink will `pull(InPort)`
+(more common) from their ports. If there is no request from any component, the stream will not start.
+
+In more details:
+
+Input port methods:
+
+
+In handlers interact with upstreams
+ - `onPush`
+ - `onUpstreamFinish`
+ - `onUpstreamFailure`
+
+Input ports can check and retrieve elements:
+- `pull` signal demand
+- `grab` take and element
+- `cancel` tell upstream to stop
+- `isAvaiable`
+
+Output port methods:
+
+Out handlers interact with upstreams:
+- `onPull`
+- `onDownstreamFinish`
+- there is no `onDownstreamFailure`, expect a cancel signal
+
+Output ports can send elements:
+- `push` send an element
+- `complete` finish the stream
+- `fail`
+- `isAvailable`
+- `isClosed`
