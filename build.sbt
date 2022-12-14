@@ -50,3 +50,7 @@ libraryDependencies += "dev.zio" %% "zio" % zioVersion
 val testVersion = "3.2.11"
 libraryDependencies += "org.scalactic" %% "scalactic" % testVersion
 libraryDependencies += "org.scalatest" %% "scalatest" % testVersion
+
+// Logging
+libraryDependencies += "com.typesafe.akka" %% "akka-slf4j" % akkaVersion
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.11"
