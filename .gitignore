@@ -2,3 +2,9 @@
 /.idea/
 /.bsp/
 /project/
+/exercises/.idea/
+/exercises/.bsp/
+/exercises/target/
+/akka-projects/.bsp/
+/akka-projects/.idea/
+/akka-projects/target/

@@ -274,7 +274,7 @@ fastSource.throttle(2, 1 second)
 
 GraphDSL is a library which enables the design the implementation of complex graphs. For instance, here is an example of building a complex graph, using GraphDSL.
 
-![graph-complex-flow](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/graph-complex-flow.png)
+![graph-complex-flow](https://github.com/GiorgosMandi/ScalaProjects/tree/main/akka-projects/src/main/resources/images/graph-complex-flow.png)
 
 ```scala
 val input = Source(1 to 1000)
@@ -304,7 +304,7 @@ graph.run()
 ```
 
 Another example is the following 
-![graph-complex-flow](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/merge-balance.png)
+![graph-complex-flow](https://github.com/GiorgosMandi/ScalaProjects/tree/main/akka-projects/src/main/resources/images/merge-balance.png)
 
 
 ```scala
@@ -501,7 +501,7 @@ preferred port and always consume from there. Another way is to configure backpr
 
 In the source code, you will find the implementation of the Fibonacci sequence as a cycle graph.
 
-![fibonacci_seq_cycle.png](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/fibonacci_seq_cycle.png)
+![fibonacci_seq_cycle.png](https://github.com/GiorgosMandi/ScalaProjects/tree/main/akka-projects/src/main/resources/images/fibonacci_seq_cycle.png)
 
 
 ## Integration with Actors
@@ -693,8 +693,8 @@ and in the end we can merge them. This can be done using
 The substreams can be merged by calling `mergeSubstreams` or `mergeSubstreamsWithParallelism`. Note that in most of the 
 time, we can configure the substreams to run in parallel 
 
-
-![fibonacci_seq_cycle.png](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/src/main/resources/images/substreams.png)
+/home/gmandi/Documents/myProjects/Educational/ScalaProjects/akka-projects/src/main/resources
+![fibonacci_seq_cycle.png](https://github.com/GiorgosMandi/ScalaProjects/tree/main/akka-projects/src/main/resources/images/substreams.png)
 
 ### Custom Shapes
 
