@@ -1,6 +1,6 @@
 # ScalaProjects
 
-This is a collection of exercises/tutorials of `scala`-related libraries/frameworks:
+This is a collection of exercises and tutorials regarding SCALA-related libraries & frameworks:
 
 ### Courses:
   - [Rock The JVM: Akka-Essentials](https://github.com/GiorgosMandi/ScalaProjects/tree/main/src/main/scala/rockTheJVM/akkaEssentials)
