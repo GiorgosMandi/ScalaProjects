@@ -8,3 +8,8 @@
 /akka-projects/.bsp/
 /akka-projects/.idea/
 /akka-projects/target/
+/spark-projects/target/
+/spark-projects/.bsp/
+/spark-projects/.idea/
+/spark-projects/sql/db.sql
+/spark-projects/src/main/resources/data-streaming/*
