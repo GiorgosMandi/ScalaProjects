@@ -2,7 +2,7 @@
 
 ## General Information
 
-## Stream Processing: 
+## Introduction - Stream Processing: 
 
 - Include new data to compute results
 - No definitive end of incoming data
@@ -12,11 +12,11 @@
   - Spark streaming operates on micro-batches
   - continues processing is an experimental feature
 
-## Pros
+### Pros
  - Much lower latency
  - Greater performance/efficency
 
-## Difficulties
+### Difficulties
 - Maintaining state and order of incoming data
 - exactly once processing in context of machine failures
 - responding at low latency
@@ -26,7 +26,10 @@ _**Note**_:
  - DStreams: low level API 
  - Structured Streaming: high level API
 
-## Structured Streaming
+---
+## Section 1 - Structured Streaming
+
+### Streaming DataFrames
 
  _**Output Modes**_:
 - append: only add new records
@@ -39,7 +42,8 @@ Triggers: when the data is written:
 - processing time: look for new data at fixed intervals
 - continues: (experimental): every processing time, create a batch with whatever new instances there are (otherwise the batch will be empty)
 
-## Aggregations
+
+#### Aggregations
 
 Comments:
 - aggregations work at micro-batches
@@ -61,7 +65,7 @@ val names = lines.select(col("value").as("name"))
   .count()
 ```
 
-## Joins
+#### Joins
 
 1. Join a Stream DF with a Static DF
 
@@ -86,3 +90,61 @@ val names = lines.select(col("value").as("name"))
     ```scala
         val streamedJoin = streamBandsDF.join(streamGuitaristsDF, streamGuitaristsDF.col("band") === streamBandsDF.col("id"), "inner")
     ```
+   
+### Streaming Dataset
+
+Streaming Datasets are very powerful as they support both functional operators and SQL like queries.
+Tradeoff:
+ - pros: 
+   - type safety
+   - expressiveness
+ - cons
+   - potential performance implications as lambdas cannot be optimized
+
+```scala
+import spark.implicits._
+
+val carSDS = spark.readStream
+  .format("json")
+  .option("dateFormat", "YYYY-mm-dd")
+  .schema(carsSchema)
+  .load("/PATH/TO/DIR")
+  .as[Car]
+
+carSDS.filter(car => car.Horsepower.getOrElse(0L) > 140L)
+```
+---
+## Section 2 - Low level Spark Streaming with DStreams
+
+Discretized Streams (aka DStreams) is a never ending sequence of RDDs. Each micro-batch that Spark Stream will delimit will be an RDD. 
+Each batch is formed by all new instances that are coming within a time interval known as **batchInterval**. The number of partitions 
+that will be assigned to each Executor is configured by a different time interval known as **blockInterval**. **Both intervals are configurable**
+
+![fibonacci_seq_cycle.png](https://raw.githubusercontent.com/GiorgosMandi/ScalaProjects/main/spark-projects/src/main/resources/images/dstream.png)
+
+To create a DStream, we need to initialize a StreamingContext using the SparkContext and the batch interval. Then, we
+define
+
+- the source
+- define transformations, which are all lazy and will not be executed without actions
+- call action
+- start computation with ssc.start() -> no more computation can be added
+- await termination or stop the computation -> you cannot restart the ssc 
+
+Here is a Simple example:
+
+```scala
+// initialize streaming context
+val ssc = new StreamingContext(sparkContext = spark.sparkContext, batchDuration = Seconds(1))
+// DStream definition
+val socketStream: DStream[String] = ssc.socketTextStream("localhost", 12345)
+// transformation = lazy
+val wordsStream: DStream[String] = socketStream.flatMap(line => line.split(" "))
+// action
+wordsStream.print()
+
+// start computation
+ssc.start()
+ssc.awaitTermination()
+```
+

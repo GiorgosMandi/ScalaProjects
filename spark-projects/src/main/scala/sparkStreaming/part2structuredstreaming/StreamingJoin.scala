@@ -10,7 +10,6 @@ object StreamingJoin {
       .master("local[2]")
       .getOrCreate()
 
-
     // Static DataFrames
     val guitarPlayers = spark
       .read.option("inferSchema", true)
